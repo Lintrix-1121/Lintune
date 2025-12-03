@@ -1,0 +1,10 @@
+# folders
+node_modules/
+uploads/
+test-uploads/
+
+
+
+# files
+.env
+
