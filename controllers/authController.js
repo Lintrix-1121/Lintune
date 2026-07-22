@@ -26,7 +26,7 @@ class AuthController {
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback",
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
       scope: ['profile', 'email'] //scope
     }, async (accessToken, refreshToken, profile, done) => {
       try {
@@ -117,16 +117,17 @@ class AuthController {
   // Success page
   authSuccess = (req, res) => {
     if (req.isAuthenticated()) {
-      res.json({
-        success: true,
-        message: 'Authentication successful!',
-        user: {
-          userId: req.user.userId,
-          userName: req.user.userName,
-          email: req.user.email,
-          provider: req.user.provider
-        }
-      });
+      res.redirect(process.env.FRONTEND_URL)
+      // res.json({
+      //   success: true,
+      //   message: 'Authentication successful!',
+      //   user: {
+      //     userId: req.user.userId,
+      //     userName: req.user.userName,
+      //     email: req.user.email,
+      //     provider: req.user.provider
+      //   }
+      // });
     } else {
       res.redirect('/auth/failure');
     }
