@@ -10,11 +10,34 @@ const app = express();
 
 // CORS Configuration BEFORE other middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], //React app URLs
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://crestune.logiphix.tech',
+      'https://api.crestune.logiphix.tech'
+    ];
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// app.use(cors({
+//   origin: ['http://localhost:3000', 'http://127.0.0.1:3000',
+//     'https://crestune.logiphix.tech', 'https://api.crestune.logiphix.tech'
+//   ], //React app URLs
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+// }));
 
 // // Handle preflight requests
 // app.options('*', cors());
