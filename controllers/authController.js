@@ -117,17 +117,9 @@ class AuthController {
   // Success page
   authSuccess = (req, res) => {
     if (req.isAuthenticated()) {
-      res.redirect(process.env.FRONTEND_URL)
-      // res.json({
-      //   success: true,
-      //   message: 'Authentication successful!',
-      //   user: {
-      //     userId: req.user.userId,
-      //     userName: req.user.userName,
-      //     email: req.user.email,
-      //     provider: req.user.provider
-      //   }
-      // });
+          const frontendUrl = process.env.FRONTEND_URL;
+          return res.redirect(`${frontendUrl}/oauth-callback?status=success`);
+      
     } else {
       res.redirect('/auth/failure');
     }
@@ -136,11 +128,8 @@ class AuthController {
   // Failure page
   authFailure = (req, res) => {
     const error = req.query.error || 'Authentication failed';
-    res.status(401).json({
-      success: false,
-      message: 'Authentication failed',
-      error: error
-    });
+      const frontendUrl = process.env.FRONTEND_URL;
+      return res.redirect(`${frontendUrl}/oauth-callback?status=error&error=${encodeURIComponent(error)}`);
   };
 
   // Logout
