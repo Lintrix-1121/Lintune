@@ -8,7 +8,7 @@ const app = express();
 
 
 
-// CORS Configuration - Add this BEFORE other middleware
+// CORS Configuration BEFORE other middleware
 app.use(cors({
   origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], //React app URLs
   credentials: true,

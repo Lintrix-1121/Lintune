@@ -22,17 +22,17 @@ class AuthController {
       }
     });
 
-    // Google OAuth Strategy with proper configuration
+    // Google OAuth Strategy configuration
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback",
-      scope: ['profile', 'email'] // Add scope here
+      scope: ['profile', 'email'] //scope
     }, async (accessToken, refreshToken, profile, done) => {
       try {
         console.log('Google profile received:', profile.displayName);
         
-        // Check if user exists with this Google ID
+        // Check if user with the Google ID exists
         let user = await this.User.findOne({
           where: {
             providerId: profile.id,
@@ -45,7 +45,7 @@ class AuthController {
           return done(null, user);
         }
 
-        // Check if user exists with this email
+        // Check if user with the email exists
         user = await this.User.findOne({
           where: {
             email: profile.emails[0].value

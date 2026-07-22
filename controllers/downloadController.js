@@ -48,7 +48,7 @@ class DownloadController {
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
       res.setHeader('Content-Length', tune.file_size);
 
-      // Stream the file
+      // Stream file
       const fileStream = fs.createReadStream(tune.file_path);
       fileStream.pipe(res);
 

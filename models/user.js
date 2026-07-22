@@ -12,22 +12,54 @@ module.exports = (sequelize, Sequelize) => {
     email: {
       type: Sequelize.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
+      validate: {
+        isEmail: true
+      }
+    },
+    password: {
+      type: Sequelize.STRING,
+      allowNull: true // Nullable for OAuth users
+    },
+    profilePicture: {
+      type: Sequelize.STRING,
+      allowNull: true
     },
     provider: {
       type: Sequelize.STRING,
-      defaultValue: 'local'
+      defaultValue: 'local',
+      validate: {
+        isIn: [['local', 'google', 'apple']]
+      }
     },
     providerId: {
       type: Sequelize.STRING,
       allowNull: true
+    },
+    refreshToken: {
+      type: Sequelize.STRING,
+      allowNull: true
+    },
+    isActive: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: true
+    },
+    lastLoginAt: {
+      type: Sequelize.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'users',
-    timestamps: true 
+    timestamps: true,
+    hooks: {
+      beforeCreate: (user) => {
+        if (user.provider === 'local' && !user.password) {
+          throw new Error('Password is required for local users');
+        }
+      }
+    }
   });
 
   return User;
 };
-
 
