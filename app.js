@@ -56,11 +56,13 @@ app.use((error, req, res, next) => {
 
 // Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-session-secret-change-this',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none',
+    domain: 'logiphix.tech',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
