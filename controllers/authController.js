@@ -117,11 +117,20 @@ class AuthController {
   // Success page
   authSuccess = (req, res) => {
     if (req.isAuthenticated()) {
+      const user = req.user;
+      //generate JWT token with user info
+      const token = jwt.sign(
+        {
+          userId: user.userId, email: user.email
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      )
           const frontendUrl = process.env.FRONTEND_URL;
-          return res.redirect(`${frontendUrl}/oauth-callback?status=success`);
+          return res.redirect(`${frontendUrl}/oauth-callback?status=success&token=${token}`);
       
     } else {
-      res.redirect('/auth/failure');
+      res.redirect(`${frontendUrl}/oauth-callback?status=error&error=Authentication failed`);
     }
   };
 
