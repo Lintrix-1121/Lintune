@@ -35,7 +35,7 @@ class DownloadController {
         });
       }
 
-      // Update play count
+      // Update play count 
       await tune.update({
         play_count: tune.play_count + 1,
         last_played: new Date()
@@ -92,7 +92,7 @@ class DownloadController {
 
 
 
-    async getFileInfo(req, res) {
+  async getFileInfo(req, res) {
     try {
       const { id } = req.params;
 
@@ -121,6 +121,66 @@ class DownloadController {
         message: 'Error retrieving file information',
         error: error.message
       });
+    }
+  }
+
+  async streamFile(req, res) {
+    try {
+      const { id } = req.params;
+
+      const tune = await this.Tune.findByPk(id);
+      if (!tune) {
+        return res.status(404).json({ success: false, message: 'File not found' });
+      }
+
+      if (tune.status !== 'active') {
+        return res.status(403).json({ success: false, message: 'File not available' });
+      }
+
+      const filePath = tune.file_path;
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ success: false, message: 'File not found on server' });
+      }
+
+      const stat = fs.statSync(filePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      // Handle range requests (for seeking)
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+
+        const file = fs.createReadStream(filePath, { start, end });
+        const head = {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': this.getMimeType(tune.file_format),
+        };
+        res.writeHead(206, head);
+        file.pipe(res);
+      } else {
+        // Full file stream (no range)
+        const head = {
+          'Content-Length': fileSize,
+          'Content-Type': this.getMimeType(tune.file_format),
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(filePath).pipe(res);
+      }
+
+      // Update play count and last played
+      await tune.update({
+        play_count: (tune.play_count || 0) + 1,
+        last_played: new Date()
+      });
+
+    } catch (error) {
+      console.error('Stream error:', error);
+      res.status(500).json({ success: false, message: 'Streaming failed', error: error.message });
     }
   }
 
