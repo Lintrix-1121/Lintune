@@ -1,4 +1,5 @@
 const express = require('express');
+const authenticate = require('../middleware/jwtAuth');
 
 module.exports = (downloadController) => {
   const router = express.Router();
