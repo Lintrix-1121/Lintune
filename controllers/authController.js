@@ -166,10 +166,10 @@ class AuthController {
       return res.status(200).json({
         authenticated: true,
         user: {
-          userId: user.userId,
-          userName: user.userName,
-          email: user.email,
-          provider: user.provider,
+          userId: req.user.userId,
+          userName: req.user.userName,
+          email: req.user.email,
+          provider: req.user.provider,
         },
       });
     } catch (err) {
