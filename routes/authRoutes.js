@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticate } = require('../middleware/jwtAuth');
+const authenticate = require('../middleware/jwtAuth');
 const router = express.Router();
 
 module.exports = (authController) => {
@@ -13,7 +13,7 @@ module.exports = (authController) => {
   
   //Other auth routes
   router.post('/logout', authController.logout);
-  router.get('/status', authController.getAuthStatus);
+  router.get('/status', authenticate, authController.getAuthStatus);
 
   return router;
 };
