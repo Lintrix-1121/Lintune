@@ -1,4 +1,5 @@
 const express = require('express');
+const authenticate = require('../middleware/jwtAuth');
 const router = express.Router();
 
 module.exports = (authController) => {
@@ -7,12 +8,12 @@ module.exports = (authController) => {
   router.get('/google/callback', authController.googleCallback);
   
   // Success and failure routes
-  router.get('/success', authController.authSuccess);
+  // router.get('/success', authController.authSuccess);
   router.get('/failure', authController.authFailure);
   
   //Other auth routes
   router.post('/logout', authController.logout);
-  router.get('/status', authController.getAuthStatus);
+  router.get('/status', authenticate, authController.getAuthStatus);
 
   return router;
 };

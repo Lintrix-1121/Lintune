@@ -1,26 +1,40 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const authenticate = (req, res, next) => {
-  // Extract token from Authorization header or query string
-  const authHeader = req.headers.authorization;
   let token = null;
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.split(' ')[1];
-  } else if (req.query.token) {
+  // Authorization: Bearer <token>
+  const authHeader = req.headers.authorization;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7);
+  }
+
+  // Optional: allow token in query string (useful only for OAuth redirects)
+  if (!token && req.query.token) {
     token = req.query.token;
   }
 
   if (!token) {
-    return res.status(401).json({ success: false, message: 'No token provided' });
+    return res.status(401).json({
+      authenticated: false,
+      message: "Authentication token is missing",
+    });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; //attach user info to request
+
+    req.user = decoded;
+
     next();
-  } catch (err) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
+  } catch (error) {
+    console.error("JWT Verification Error:", error.message);
+
+    return res.status(401).json({
+      authenticated: false,
+      message: "Invalid or expired token",
+    });
   }
 };
 
