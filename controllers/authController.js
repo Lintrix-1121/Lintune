@@ -154,6 +154,13 @@ class AuthController {
   // Return authenticated user.
   getAuthStatus = async (req, res) => {
     try {
+      if(!req.user) {
+        return res.status(401).json({
+          authenticated: false,
+          message: "No authenticated user"
+        });
+        
+      }
       const user = await this.User.findByPk(req.user.userId);
 
       if (!user) {
