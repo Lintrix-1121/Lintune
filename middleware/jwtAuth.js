@@ -1,41 +1,35 @@
 const jwt = require("jsonwebtoken");
 
 const authenticate = (req, res, next) => {
-  console.log("JWT AUTH");
-  console.log ("Authorization:", req.headers.authorization);
-  let token = null;
-
-  // Authorization: Bearer <token>
   const authHeader = req.headers.authorization;
 
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    token = authHeader.substring(7);
-  }
+  console.log("Authorization:", authHeader);
 
-  // Optional: allow token in query string (useful only for OAuth redirects)
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
-
-  if (!token) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
       authenticated: false,
-      message: "Authentication token is missing",
+      message: "No token"
     });
   }
+
+  const token = authHeader.substring(7);
+
+  console.log("Token:", token);
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    console.log("Decoded:", decoded);
+
     req.user = decoded;
 
     next();
-  } catch (error) {
-    console.error("JWT Verification Error:", error.message);
+  } catch (err) {
+    console.error("JWT ERROR:", err);
 
     return res.status(401).json({
       authenticated: false,
-      message: "Invalid or expired token",
+      message: err.message
     });
   }
 };

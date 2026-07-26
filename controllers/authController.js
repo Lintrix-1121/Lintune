@@ -157,15 +157,17 @@ class AuthController {
       if(!req.user) {
         return res.status(401).json({
           authenticated: false,
-          message: "No authenticated user"
+          message: "req.user missing"
         });
         
       }
       const user = await this.User.findByPk(req.user.userId);
+      console.log("DB user =", user);
 
       if (!user) {
         return res.status(401).json({
           authenticated: false,
+          message: "User not found",
           user: null,
         });
       }
