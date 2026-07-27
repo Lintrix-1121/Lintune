@@ -55,11 +55,17 @@ module.exports = (sequelize, Sequelize) => {
     fingerprint: { type: Sequelize.STRING(500) },
 
     // Playback & User Data
-    play_count: { type: Sequelize.INTEGER, defaultValue: 0 },
     skip_count: { type: Sequelize.INTEGER, defaultValue: 0 },
     rating: { type: Sequelize.FLOAT },
     last_played: { type: Sequelize.DATE },
     favorite: { type: Sequelize.BOOLEAN, defaultValue: false },
+    stream_count: { type: Sequelize.BIGINT, defaultValue: 0 },
+    download_count: { type: Sequelize.BIGINT, defaultValue: 0 },
+    play_count: { type: Sequelize.VIRTUAL,
+      get() {
+        return this.stream_count + this.download_count;
+      }
+    },
 
     // Ownership & Licensing
     owner_id: { type: Sequelize.BIGINT },

@@ -51,6 +51,36 @@ router.delete('/:id', tuneController.deleteTune.bind(tuneController));
 // Delete multiple tunes
 router.delete('/', tuneController.deleteMultipleTunes.bind(tuneController));
 
+// Monthly streams for a specific tune
+router.get('/:id/streams/monthly', tuneController.getMonthlyStreams.bind(tuneController));
+
+// Overall monthly streams (all tunes)
+router.get('/stats/monthly', tuneController.getOverallMonthlyStreams.bind(tuneController));
+
+// Repeat rate
+router.get('/:id/repeat-rate', tuneController.getRepeatRate.bind(tuneController));
+
+// Averages e.g average daily streams
+router.get('/stats/averages', tuneController.getAverageStreams.bind(tuneController));
+
+// Get playlist add count if logged as events
+router.get('/:id/playlist-adds', tuneController.getPlaylistAddCount.bind(tuneController));
+
+// Monthly streams for a specific tune
+router.get('/:id/streams/monthly', tuneController.getMonthlyStreams.bind(tuneController));
+
+// Overall monthly streams (all tunes)
+router.get('/stats/monthly', tuneController.getOverallMonthlyStreams.bind(tuneController));
+
+// Average streams per day over last N days
+router.get('/stats/averages', tuneController.getAverageStreams.bind(tuneController));
+
+// Repeat rate for a tune
+router.get('/:id/repeat-rate', tuneController.getRepeatRate.bind(tuneController));
+
+// Playlist add count for a tune
+router.get('/:id/playlist-adds', tuneController.getPlaylistAddCount.bind(tuneController));
+
 module.exports = router;
 
 

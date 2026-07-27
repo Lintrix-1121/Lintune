@@ -1,4 +1,5 @@
 const TuneModel = require('../models/song');
+const { TuneEvent } = require('../models/tuneEvent')
 const sequelize = require('../config/dbConfig');
 const { Sequelize, Op } = require('sequelize');
 const Tune = TuneModel(sequelize, Sequelize);
@@ -111,7 +112,18 @@ class TuneController {
           success: false,
           message: 'Tune not found'
         });
-      }
+      }  
+      const userId = req.user ? req.user.userId : null;
+        await Promise.all([
+          tune.increment('stream_count'),
+          TuneEvent.create({
+            tune_id: tune_id,
+            user_id: userId,
+            event_type: 'stream',
+            timestamp: new Date()
+          })
+        ]);
+      
 
       // Update play statistics
       await tune.update({
@@ -123,6 +135,7 @@ class TuneController {
         success: true,
         message: 'Play recorded successfully',
         data: {
+          stream_count: tune.stream_count + 1,
           play_count: tune.play_count + 1,
           last_played: new Date()
         }
@@ -262,8 +275,8 @@ class TuneController {
       const tune = await Tune.findOne({
         where: { id, status: 'active' },
         attributes: [
-          'id', 'title', 'artist',
-          'play_count', 'skip_count', 'rating', 
+          'id', 'title', 'artist', 'stream_count', 'download_count',
+          'play_count', 'skip_count', 'rating',
           'last_played', 'favorite', 'duration'
         ]
       });
@@ -799,6 +812,254 @@ class TuneController {
       });
     }
   }
+
+  
+  async getMonthlyStreams(req, res) {
+    try {
+      const { id } = req.params;
+      const { year, month } = req.query; // optional, default to current month
+
+      const where = { tune_id: id, event_type: 'stream' };
+      if (year && month) {
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 1);
+        where.timestamp = { [Op.gte]: start, [Op.lt]: end };
+      } else {
+        // current month
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        where.timestamp = { [Op.gte]: start, [Op.lt]: end };
+      }
+
+      const count = await TuneEvent.count({ where });
+      // Also get total streams of all time
+      const totalStreams = await TuneEvent.count({ where: { tune_id: id, event_type: 'stream' } });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          tune_id: id,
+          monthly_streams: count,
+          total_streams: totalStreams,
+          month: year && month ? `${year}-${month}` : 'current'
+        }
+      });
+    } catch (error) {  }
+  }
+
+  async getAverageStreams(req, res) {
+    try {
+      const { days = 30 } = req.query;
+      const start = new Date();
+      start.setDate(start.getDate() - parseInt(days));
+
+      const count = await TuneEvent.count({
+        where: {
+          event_type: 'stream',
+          timestamp: { [Op.gte]: start }
+        }
+      });
+      const avg = count / days;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          period_days: parseInt(days),
+          total_streams: count,
+          average_streams_per_day: avg.toFixed(2)
+        }
+      });
+    } catch (error) {  }
+}
+
+
+  async getMonthlyStreams(req, res) {
+    try {
+      const { id } = req.params;
+      const { year, month } = req.query; // optional, default to current month
+
+      const where = { tune_id: id, event_type: 'stream' };
+      let start, end;
+      if (year && month) {
+        start = new Date(year, month - 1, 1);
+        end = new Date(year, month, 1);
+      } else {
+        const now = new Date();
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      }
+      where.timestamp = { [Op.gte]: start, [Op.lt]: end };
+
+      const monthlyStreams = await TuneEvent.count({ where });
+      const totalStreams = await TuneEvent.count({ where: { tune_id: id, event_type: 'stream' } });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          tune_id: id,
+          monthly_streams: monthlyStreams,
+          total_streams: totalStreams,
+          period: `${start.toISOString().slice(0,7)}`
+        }
+      });
+    } catch (error) {
+      console.error('Get monthly streams error:', error);
+      res.status(500).json({ success: false, message: 'Error fetching monthly streams', error: error.message });
+    }
+  }
+
+  // --- NEW: Overall monthly streams for all tunes ---
+  async getOverallMonthlyStreams(req, res) {
+    try {
+      const { year, month } = req.query;
+      const now = new Date();
+      const start = year && month ? new Date(year, month - 1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = year && month ? new Date(year, month, 1) : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+      const totalStreams = await TuneEvent.count({
+        where: {
+          event_type: 'stream',
+          timestamp: { [Op.gte]: start, [Op.lt]: end }
+        }
+      });
+      const totalDownloads = await TuneEvent.count({
+        where: {
+          event_type: 'download',
+          timestamp: { [Op.gte]: start, [Op.lt]: end }
+        }
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          period: `${start.toISOString().slice(0,7)}`,
+          total_streams: totalStreams,
+          total_downloads: totalDownloads
+        }
+      });
+    } catch (error) {
+      console.error('Get overall monthly streams error:', error);
+      res.status(500).json({ success: false, message: 'Error fetching overall streams', error: error.message });
+    }
+  }
+
+  // --- NEW: Average streams per day over last N days ---
+  async getAverageStreams(req, res) {
+    try {
+      const { days = 30 } = req.query;
+      const start = new Date();
+      start.setDate(start.getDate() - parseInt(days));
+
+      const totalStreams = await TuneEvent.count({
+        where: {
+          event_type: 'stream',
+          timestamp: { [Op.gte]: start }
+        }
+      });
+      const avg = totalStreams / days;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          period_days: parseInt(days),
+          total_streams: totalStreams,
+          average_streams_per_day: avg.toFixed(2)
+        }
+      });
+    } catch (error) {
+      console.error('Get average streams error:', error);
+      res.status(500).json({ success: false, message: 'Error fetching average streams', error: error.message });
+    }
+  }
+
+  // --- NEW: Repeat rate for a specific tune ---
+  // Definition: Percentage of streams that are repeated by the same user within a configurable threshold (default 24 hours).
+  async getRepeatRate(req, res) {
+    try {
+      const { id } = req.params;
+      const { thresholdHours = 24 } = req.query;
+
+      // Fetch all stream events for this tune, ordered by user and timestamp
+      const events = await TuneEvent.findAll({
+        where: { tune_id: id, event_type: 'stream' },
+        order: [['user_id', 'ASC'], ['timestamp', 'ASC']],
+        attributes: ['user_id', 'timestamp']
+      });
+
+      if (events.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            tune_id: id,
+            repeat_rate: 0,
+            total_plays: 0,
+            repeated_plays: 0,
+            threshold_hours: parseFloat(thresholdHours)
+          }
+        });
+      }
+
+      // Group by user
+      const userTimestamps = {};
+      events.forEach(e => {
+        const uid = e.user_id || 'anonymous'; // treat null as a group
+        if (!userTimestamps[uid]) userTimestamps[uid] = [];
+        userTimestamps[uid].push(e.timestamp);
+      });
+
+      let repeatedCount = 0;
+      for (const uid in userTimestamps) {
+        const timestamps = userTimestamps[uid].sort((a, b) => a - b);
+        for (let i = 1; i < timestamps.length; i++) {
+          const diffHours = (timestamps[i] - timestamps[i - 1]) / (1000 * 60 * 60);
+          if (diffHours <= thresholdHours) {
+            repeatedCount++;
+          }
+        }
+      }
+
+      const totalPlays = events.length;
+      const repeatRate = totalPlays > 0 ? (repeatedCount / totalPlays) * 100 : 0;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          tune_id: id,
+          repeat_rate: repeatRate.toFixed(2),
+          total_plays: totalPlays,
+          repeated_plays: repeatedCount,
+          threshold_hours: parseFloat(thresholdHours)
+        }
+      });
+    } catch (error) {
+      console.error('Get repeat rate error:', error);
+      res.status(500).json({ success: false, message: 'Error calculating repeat rate', error: error.message });
+    }
+  }
+
+  // --- NEW: Playlist add count for a specific tune ---
+  // Assumes we log playlist_add events in TuneEvent.
+  async getPlaylistAddCount(req, res) {
+    try {
+      const { id } = req.params;
+      const count = await TuneEvent.count({
+        where: { tune_id: id, event_type: 'playlist_add' }
+      });
+      res.status(200).json({
+        success: true,
+        data: {
+          tune_id: id,
+          playlist_add_count: count
+        }
+      });
+    } catch (error) {
+      console.error('Get playlist add count error:', error);
+      res.status(500).json({ success: false, message: 'Error fetching playlist add count', error: error.message });
+    }
+  }
+
+
 
 }
 
