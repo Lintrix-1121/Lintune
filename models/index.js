@@ -18,8 +18,7 @@ User.hasMany(Tune, {
 });
 
 Tune.belongsTo(User, {
-    foreignKey: 'owner_id',
-    targetKey: 'owner_id'
+    foreignKey: 'owner_id'
 });
 
 Tune.belongsTo(User, { 
