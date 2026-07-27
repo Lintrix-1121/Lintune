@@ -1,5 +1,4 @@
-const { Tune } = require('../models/song');
-const { TuneEvent } = require('../models/tuneEvent');
+const { tune: Tune, tuneEvent: TuneEvent } = require('../models');
 const path = require('path');
 const fs = require('fs');
 
