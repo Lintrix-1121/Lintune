@@ -1,7 +1,6 @@
 const { Tune, TuneEvent } = require('../models')
 const sequelize = require('../config/dbConfig');
 const { Sequelize, Op } = require('sequelize');
-const Tune = TuneModel(sequelize, Sequelize);
 
 class TuneController {
   constructor() {
