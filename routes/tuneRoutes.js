@@ -81,6 +81,10 @@ router.get('/:id/repeat-rate', tuneController.getRepeatRate.bind(tuneController)
 // Playlist add count for a tune
 router.get('/:id/playlist-adds', tuneController.getPlaylistAddCount.bind(tuneController));
 
+router.get('/stats/totals', tuneController.getTotalStats.bind(tuneController));
+
+router.get('/stats/timeline', tuneController.getTimelineData.bind(tuneController));
+
 module.exports = router;
 
 

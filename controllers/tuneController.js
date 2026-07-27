@@ -1057,6 +1057,108 @@ class TuneController {
     }
   }
 
+  async getTotalStats(req, res) {
+    try {
+      const [totalStreams, totalDownloads, totalTracks, totalStorage] = await Promise.all([
+        Tune.sum('stream_count'),
+        Tune.sum('download_count'),
+        Tune.count({ where: { status: 'active' } }),
+        Tune.sum('file_size', { where: { status: 'active' } })
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          total_streams: totalStreams || 0,
+          total_downloads: totalDownloads || 0,
+          total_tracks: totalTracks || 0,
+          total_storage: totalStorage || 0
+        }
+      });
+    } catch (error) {
+      console.error('Get total stats error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching total stats',
+        error: error.message
+      });
+    }
+  }
+
+  // Get timeline data for chart (daily/weekly/monthly)
+  async getTimelineData(req, res) {
+    try {
+      const { period = 'month', limit = 6 } = req.query;
+      const now = new Date();
+      let startDate = new Date(now);
+      let groupFormat;
+
+      switch (period) {
+        case 'day':
+          startDate.setDate(now.getDate() - parseInt(limit));
+          groupFormat = '%Y-%m-%d';
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - parseInt(limit) * 7);
+          groupFormat = '%Y-%m-%d';
+          break;
+        case 'month':
+          startDate.setMonth(now.getMonth() - parseInt(limit));
+          groupFormat = '%Y-%m';
+          break;
+        case 'year':
+          startDate.setFullYear(now.getFullYear() - parseInt(limit));
+          groupFormat = '%Y';
+          break;
+        default:
+          startDate.setMonth(now.getMonth() - 6);
+          groupFormat = '%Y-%m';
+      }
+
+      // Query tune_events grouped by date
+      const results = await TuneEvent.findAll({
+        where: {
+          event_type: 'stream',
+          timestamp: { [Op.gte]: startDate }
+        },
+        attributes: [
+          [sequelize.fn('DATE_FORMAT', sequelize.col('timestamp'), groupFormat), 'date'],
+          [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+        ],
+        group: ['date'],
+        order: [[sequelize.col('date'), 'ASC']],
+        raw: true
+      });
+
+      // Format for Chart.js
+      const labels = results.map(r => r.date);
+      const data = results.map(r => parseInt(r.count));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Streams',
+              data,
+              borderColor: 'rgb(59, 130, 246)',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.4
+            }
+          ]
+        }
+      });
+    } catch (error) {
+      console.error('Get timeline data error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching timeline data',
+        error: error.message
+      });
+    }
+  }
 
 
 }
