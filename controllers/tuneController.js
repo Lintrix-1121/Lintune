@@ -1,4 +1,4 @@
-const { Tune, TuneEvent } = require('../models');
+const { Tune, TuneEvent } = require('../models/index');
 const sequelize = require('../config/dbConfig');
 const { Sequelize, Op } = require('sequelize');
 
