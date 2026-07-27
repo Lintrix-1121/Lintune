@@ -15,7 +15,6 @@ const TuneEvent = db.tuneEvent;
 
 User.hasMany(Tune, {
     foreignKey: 'owner_id',
-    sourceKey: 'owner_id'
 });
 
 Tune.belongsTo(User, {
