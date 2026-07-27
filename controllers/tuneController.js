@@ -1,4 +1,4 @@
-const { Tune } = require('../models/song');
+const { Tune, TuneEvent } = require('../models');
 const TuneEvent = require('../models/tuneEvent');
 const sequelize = require('../config/dbConfig');
 const { Sequelize, Op } = require('sequelize');
@@ -116,7 +116,7 @@ class TuneController {
         await Promise.all([
           tune.increment('stream_count'),
           TuneEvent.create({
-            tune_id: tune_id,
+            tune_id: tune.id,
             user_id: userId,
             event_type: 'stream',
             timestamp: new Date()

@@ -38,3 +38,4 @@ module.exports = (sequelize, Sequelize) => {
 
   return TuneEvent;
 };
+
