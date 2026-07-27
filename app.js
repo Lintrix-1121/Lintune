@@ -95,7 +95,7 @@ app.use('/auth', require('./routes/authRoutes')(authController));
 app.use('/users', require('./routes/userRoutes')(userController));
 app.use('/upload', require('./routes/uploadRoutes')(uploadController));
 app.use('/dold', require('./routes/downloadRoutes')(downloadController));
-app.use('/tune', require('./routes/tuneRoutes')(tuneController));
+app.use('/tune', require('./routes/tuneRoutes'));
 
 
 // Test route
