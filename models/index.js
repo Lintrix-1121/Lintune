@@ -5,16 +5,16 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
-db.user = require('./user')(sequelize_config, Sequelize);
-db.tune = require('./song')(sequelize_config, Sequelize);
-db.tuneEvent = require('./tuneEvent')(sequelize_config, Sequelize);
+db.user = require('./user')(sequelize, Sequelize);
+db.tune = require('./song')(sequelize, Sequelize);
+db.tuneEvent = require('./tuneEvent')(sequelize, Sequelize);
 
 const User = db.user;
 const Tune = db.tune;
-const TuneEvent = db.tune_event;
+const TuneEvent = db.tuneEvent;
 
 User.hasMany(Tune, {
-    forienKey: 'owner_id',
+    foreignKey: 'owner_id',
     sourceKey: 'owner_id'
 });
 
@@ -34,14 +34,14 @@ Tune.hasMany(TuneEvent, {
     foreignKey: 'tune_id'
 });
 TuneEvent.belongsTo(Tune, {
-    forienKey: 'tune_id'
+    foreignKey: 'tune_id'
 });
 
 User.hasMany(TuneEvent, {
-    forienKey: 'user_id'
+    foreignKey: 'user_id'
 });
 TuneEvent.belongsTo(User, {
-    forienKey: 'user_id'
+    foreignKey: 'user_id'
 })
 
 module.exports = db;
