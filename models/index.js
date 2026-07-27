@@ -11,7 +11,7 @@ db.tuneEvent = require('./tuneEvent')(sequelize_config, Sequelize);
 
 const User = db.user;
 const Tune = db.tune;
-const TuneEvent = db.tuneEvent;
+const TuneEvent = db.tune_event;
 
 User.hasMany(Tune, {
     forienKey: 'owner_id',

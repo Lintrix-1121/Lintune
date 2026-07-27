@@ -816,7 +816,7 @@ class TuneController {
   async getMonthlyStreams(req, res) {
     try {
       const { id } = req.params;
-      const { year, month } = req.query; // optional, default to current month
+      const { year, month } = req.query; //default to current month
 
       const where = { tune_id: id, event_type: 'stream' };
       if (year && month) {
@@ -876,7 +876,7 @@ class TuneController {
   async getMonthlyStreams(req, res) {
     try {
       const { id } = req.params;
-      const { year, month } = req.query; // optional, default to current month
+      const { year, month } = req.query; // default to current month
 
       const where = { tune_id: id, event_type: 'stream' };
       let start, end;
@@ -908,7 +908,7 @@ class TuneController {
     }
   }
 
-  // --- NEW: Overall monthly streams for all tunes ---
+  //Overall monthly streams for all tunes
   async getOverallMonthlyStreams(req, res) {
     try {
       const { year, month } = req.query;
@@ -943,7 +943,7 @@ class TuneController {
     }
   }
 
-  // --- NEW: Average streams per day over last N days ---
+  //Average streams per day over last N days
   async getAverageStreams(req, res) {
     try {
       const { days = 30 } = req.query;
@@ -972,8 +972,8 @@ class TuneController {
     }
   }
 
-  // --- NEW: Repeat rate for a specific tune ---
-  // Definition: Percentage of streams that are repeated by the same user within a configurable threshold (default 24 hours).
+  // Repeat rate for a specific tune 
+  //Percentage of streams that are repeated by the same user within a configurable threshold (default 24 hours).
   async getRepeatRate(req, res) {
     try {
       const { id } = req.params;
@@ -1037,7 +1037,7 @@ class TuneController {
     }
   }
 
-  // --- NEW: Playlist add count for a specific tune ---
+  //Playlist add count for a specific tune
   // Assumes we log playlist_add events in TuneEvent.
   async getPlaylistAddCount(req, res) {
     try {
