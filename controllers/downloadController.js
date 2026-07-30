@@ -108,7 +108,7 @@ class DownloadController {
       //Increment stream_count and log event
       const userId = req.user ? req.user.userId : null;
       await Promise.all([
-        tune.increment('stream_count'),
+        // tune.increment('stream_count'),
         TuneEvent.create({
           tune_id: tune.id,
           user_id: userId,
