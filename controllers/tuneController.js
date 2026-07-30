@@ -476,13 +476,13 @@ class TuneController {
         genre,
         year,
         format,
-        favorite, // New filter for favorites
-        minRating // New filter for minimum rating
+        favorite, 
+        minRating 
       } = req.query;
 
       const offset = (page - 1) * limit;
 
-      // Build where clause for filters
+      //where clause for filters
       const whereClause = { status: 'active' };
       
       if (genre) {
@@ -550,7 +550,7 @@ class TuneController {
         page = 1,
         limit = 20,
         searchIn = 'both',
-        includePlaybackStats = 'true' // New parameter to include playback stats
+        includePlaybackStats = 'true' //parameter to include playback stats
       } = req.query;
 
       if (!query || query.trim() === '') {

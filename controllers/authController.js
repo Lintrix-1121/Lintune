@@ -179,6 +179,12 @@ class AuthController {
           userName: req.user.userName,
           email: req.user.email,
           provider: req.user.provider,
+          providerId: req.user.providerId,
+          createdAt: req.user.createdAt,
+          updatedAt: req.user.updatedAt,
+          profilePicture: req.user.profilePicture,
+          lastloginAt: req.user.lastloginAt,
+          isActive: req.user.isActive,
         },
       });
     } catch (err) {
