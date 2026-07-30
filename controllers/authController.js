@@ -151,51 +151,49 @@ class AuthController {
   };
 
 
-  // Return authenticated user.
   getAuthStatus = async (req, res) => {
-    try {
-      if(!req.user) {
-        return res.status(401).json({
-          authenticated: false,
-          message: "req.user missing"
-        });
-        
-      }
-      const user = await this.User.findByPk(req.user.userId);
-      console.log("DB user =", user);
-
-      if (!user) {
-        return res.status(401).json({
-          authenticated: false,
-          message: "User not found",
-          user: null,
-        });
-      }
-
-      return res.status(200).json({
-        authenticated: true,
-        user: {
-          userId: req.user.userId,
-          userName: req.user.userName,
-          email: req.user.email,
-          provider: req.user.provider,
-          providerId: req.user.providerId,
-          createdAt: req.user.createdAt,
-          updatedAt: req.user.updatedAt,
-          profilePicture: req.user.profilePicture,
-          lastloginAt: req.user.lastloginAt,
-          isActive: req.user.isActive,
-        },
-      });
-    } catch (err) {
-      console.error(err);
-
-      return res.status(500).json({
+  try {
+    if (!req.user) {
+      return res.status(401).json({
         authenticated: false,
-        message: "Unable to verify authentication",
+        message: "req.user missing"
       });
     }
-  };
+
+    const dbUser = await this.User.findByPk(req.user.userId);
+    console.log("DB user =", dbUser);  // full user from DB
+
+    if (!dbUser) {
+      return res.status(401).json({
+        authenticated: false,
+        message: "User not found",
+        user: null,
+      });
+    }
+
+    return res.status(200).json({
+      authenticated: true,
+      user: {
+        userId: dbUser.userId,          // ✅ from DB
+        userName: dbUser.userName,
+        email: dbUser.email,
+        provider: dbUser.provider,
+        providerId: dbUser.providerId,
+        createdAt: dbUser.createdAt,
+        updatedAt: dbUser.updatedAt,
+        profilePicture: dbUser.profilePicture,
+        lastLoginAt: dbUser.lastLoginAt,   // ✅ correct casing
+        isActive: dbUser.isActive,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      authenticated: false,
+      message: "Unable to verify authentication",
+    });
+  }
+};
 }
 
 module.exports = AuthController;
