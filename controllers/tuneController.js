@@ -1058,23 +1058,23 @@ class TuneController {
   }
 
   async getTotalStats(req, res) {
-    try {
-      const [totalStreams, totalDownloads, totalTracks, totalStorage] = await Promise.all([
-        Tune.sum('stream_count'),
-        Tune.sum('download_count'),
-        Tune.count({ where: { status: 'active' } }),
-        Tune.sum('file_size', { where: { status: 'active' } })
-      ]);
+  try {
+    const [totalPlays, totalSkips, totalTracks, totalStorage] = await Promise.all([
+      Tune.sum('play_count'),    // use play_count
+      Tune.sum('skip_count'),    // optional
+      Tune.count({ where: { status: 'active' } }),
+      Tune.sum('file_size', { where: { status: 'active' } })
+    ]);
 
-      res.status(200).json({
-        success: true,
-        data: {
-          total_streams: totalStreams || 0,
-          total_downloads: totalDownloads || 0,
-          total_tracks: totalTracks || 0,
-          total_storage: totalStorage || 0
-        }
-      });
+    res.status(200).json({
+      success: true,
+      data: {
+        total_streams: totalPlays || 0,
+        total_downloads: 0,      // if not tracked, set to 0
+        total_tracks: totalTracks || 0,
+        total_storage: totalStorage || 0
+      }
+    });
     } catch (error) {
       console.error('Get total stats error:', error);
       res.status(500).json({
