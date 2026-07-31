@@ -1,8 +1,9 @@
 const express = require('express');
 const authenticate = require('../middleware/jwtAuth');
-const router = express.Router();
+
 
 module.exports = (authController) => {
+  const router = express.Router();
   // Google OAuth routes
   router.get('/google', authController.googleAuth);
   router.get('/google/callback', authController.googleCallback);
