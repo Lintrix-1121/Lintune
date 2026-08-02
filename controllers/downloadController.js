@@ -8,70 +8,70 @@ class DownloadController {
     this.Tune = Tune;
   }
 
-  // async downloadFile(req, res) {
-  //   try {
-  //     const { id } = req.params;
+  async downloadFile(req, res) {
+    try {
+      const { id } = req.params;
 
-  //     const tune = await this.Tune.findByPk(id);
+      const tune = await this.Tune.findByPk(id);
       
-  //     if (!tune) {
-  //       return res.status(404).json({
-  //         success: false,
-  //         message: 'File not found'
-  //       });
-  //     }
+      if (!tune) {
+        return res.status(404).json({
+          success: false,
+          message: 'File not found'
+        });
+      }
 
-  //     if (tune.status !== 'active') {
-  //       return res.status(403).json({
-  //         success: false,
-  //         message: 'File is not available for download'
-  //       });
-  //     }
+      if (tune.status !== 'active') {
+        return res.status(403).json({
+          success: false,
+          message: 'File is not available for download'
+        });
+      }
 
-  //     // Check if file exists
-  //     if (!fs.existsSync(tune.file_path)) {
-  //       return res.status(404).json({
-  //         success: false,
-  //         message: 'File not found on server'
-  //       });
-  //     }
+      // Check if file exists
+      if (!fs.existsSync(tune.file_path)) {
+        return res.status(404).json({
+          success: false,
+          message: 'File not found on server'
+        });
+      }
 
-  //     // Update play count 
-  //     await tune.update({
-  //       play_count: tune.play_count + 1,
-  //       last_played: new Date()
-  //     });
+      // Update play count 
+      await tune.update({
+        play_count: tune.play_count + 1,
+        last_played: new Date()
+      });
 
-  //     // Set appropriate headers for download
-  //     const filename = `${tune.artist} - ${tune.title}${path.extname(tune.file_path)}`;
+      // Set appropriate headers for download
+      const filename = `${tune.artist} - ${tune.title}${path.extname(tune.file_path)}`;
       
-  //     res.setHeader('Content-Type', this.getMimeType(tune.file_format));
-  //     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-  //     res.setHeader('Content-Length', tune.file_size);
+      res.setHeader('Content-Type', this.getMimeType(tune.file_format));
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader('Content-Length', tune.file_size);
 
-  //     // Stream file
-  //     const fileStream = fs.createReadStream(tune.file_path);
-  //     fileStream.pipe(res);
+      // Stream file
+      const fileStream = fs.createReadStream(tune.file_path);
+      fileStream.pipe(res);
 
-  //     fileStream.on('error', (error) => {
-  //       console.error('File stream error:', error);
-  //       if (!res.headersSent) {
-  //         res.status(500).json({
-  //           success: false,
-  //           message: 'Error streaming file'
-  //         });
-  //       }
-  //     });
+      fileStream.on('error', (error) => {
+        console.error('File stream error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            message: 'Error streaming file'
+          });
+        }
+      });
 
-  //   } catch (error) {
-  //     console.error('Download error:', error);
-  //     res.status(500).json({
-  //       success: false,
-  //       message: 'Error downloading file',
-  //       error: error.message
-  //     });
-  //   }
-  // }
+    } catch (error) {
+      console.error('Download error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error downloading file',
+        error: error.message
+      });
+    }
+  }
 
   getMimeType(fileFormat) {
     const mimeTypes = {
@@ -151,39 +151,39 @@ class DownloadController {
     }
   }
 
-  async downloadFile(req, res) {
-    try {
-      const { id } = req.params;
-      const tune = await Tune.findByPk(id);
-      if (!tune) return res.status(404).json({ success: false, message: 'File not found' });
-      if (tune.status !== 'active') return res.status(403).json({ success: false, message: 'File not available' });
-      if (!fs.existsSync(tune.file_path)) return res.status(404).json({ success: false, message: 'File not found on server' });
+  // async downloadFile(req, res) {
+  //   try {
+  //     const { id } = req.params;
+  //     const tune = await Tune.findByPk(id);
+  //     if (!tune) return res.status(404).json({ success: false, message: 'File not found' });
+  //     if (tune.status !== 'active') return res.status(403).json({ success: false, message: 'File not available' });
+  //     if (!fs.existsSync(tune.file_path)) return res.status(404).json({ success: false, message: 'File not found on server' });
 
-      //Increment download_count and log event
-      const userId = req.user ? req.user.userId : null;
-      await Promise.all([
-        tune.increment('download_count'),
-        TuneEvent.create({
-          tune_id: tune.id,
-          user_id: userId,
-          event_type: 'download',
-          timestamp: new Date()
-        })
-      ]);
+  //     //Increment download_count and log event
+  //     const userId = req.user ? req.user.userId : null;
+  //     await Promise.all([
+  //       tune.increment('download_count'),
+  //       TuneEvent.create({
+  //         tune_id: tune.id,
+  //         user_id: userId,
+  //         event_type: 'download',
+  //         timestamp: new Date()
+  //       })
+  //     ]);
 
-      // Set headers and stream
-      const filename = `${tune.artist} - ${tune.title}${path.extname(tune.file_path)}`;
-      res.setHeader('Content-Type', this.getMimeType(tune.file_format));
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-      res.setHeader('Content-Length', tune.file_size);
-      const fileStream = fs.createReadStream(tune.file_path);
-      fileStream.pipe(res);
+  //     // Set headers and stream
+  //     const filename = `${tune.artist} - ${tune.title}${path.extname(tune.file_path)}`;
+  //     res.setHeader('Content-Type', this.getMimeType(tune.file_format));
+  //     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+  //     res.setHeader('Content-Length', tune.file_size);
+  //     const fileStream = fs.createReadStream(tune.file_path);
+  //     fileStream.pipe(res);
 
-    } catch (error) {
-      console.error('Download error:', error);
-      res.status(500).json({ success: false, message: 'Error downloading file', error: error.message });
-    }
-  }
+  //   } catch (error) {
+  //     console.error('Download error:', error);
+  //     res.status(500).json({ success: false, message: 'Error downloading file', error: error.message });
+  //   }
+  // }
 
 
   async getFileInfo(req, res) {
