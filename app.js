@@ -3,6 +3,7 @@ const session = require('express-session');
 const passport = require('passport');
 const cors = require('cors');
 require('dotenv').config();
+const authenticate = require('./middleware/jwtAuth');
 
 const app = express();
 
@@ -32,7 +33,13 @@ const app = express();
 
 
 // App middleware
-app.use(express.json());
+app.use(express.json(
+  {
+    verify: (req,res, buf) => {
+    req.rawBody = buf.toString();
+  }
+  }
+));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Error handling middleware
@@ -76,12 +83,21 @@ const sequelize = require('./config/dbConfig');
 const User = require('./models/user')(sequelize, require('sequelize').Sequelize);
 const Tune = require('./models/song')(sequelize, require('sequelize').Sequelize);
 
+const SubscriptionPlan = require('./models/subscriptionPlans')(sequelize, require('sequelize').Sequelize);
+const Subscription = require('./models/subscriptions')(sequelize, require('sequelize').Sequelize);
+const Payments = require('./models/payments')(sequelize, require('sequelize').Sequelize);
+
 // Initialize controllers
 const AuthController = require('./controllers/authController');
 const UserController = require('./controllers/userController');
 const UploadController = require('./controllers/uploadController');
 const DownloadController = require('./controllers/downloadController');
 const TuneController = require('./controllers/tuneController');
+const { verify } = require('jsonwebtoken');
+
+const SubscriptionPlanController = require('./controllers/subscriptionPlanController');
+const SubscriptionController = require('./controllers/subscriptionController');
+const PaymentsController = require('./controllers/paymentController');
 
 const authController = new AuthController(User);
 const userController = new UserController(User);
@@ -89,13 +105,39 @@ const uploadController = new UploadController(Tune);
 const downloadController = new DownloadController(Tune);
 const tuneController = new TuneController(Tune);
 
+const subscriptionPlanController = new SubscriptionPlanController(
+  SubscriptionPlan
+);
+const subscriptionController = new SubscriptionController(
+  Subscription, SubscriptionPlan, Payments, User
+);
+const paymentController = new PaymentsController(
+  Payments, Subscription, SubscriptionPlan
+);
+
+const subscriptionGuard = require('./middleware/requireActiveSubscrption')(
+  Subscription
+);
+
 
 // Routes
 app.use('/auth', require('./routes/authRoutes')(authController));
 app.use('/users', require('./routes/userRoutes')(userController));
-app.use('/upload', require('./routes/uploadRoutes')(uploadController));
+app.use('/upload', 
+  authenticate, subscriptionGuard,
+  require('./routes/uploadRoutes')(uploadController));
 app.use('/dold', require('./routes/downloadRoutes')(downloadController));
 app.use('/tune', require('./routes/tuneRoutes'));
+
+app.use('/subscription-plans', require('./routes/subscriptionnPlanRoutes')(
+  subscriptionPlanController, authenticate
+));
+app.use('/subscriptions', require('./routes/subscriptionRoutes')(
+  subscriptionController, authenticate
+));
+app.use('/payments', require('./routes/paymentRoutes')(
+  paymentController, authenticate
+));
 
 
 // Test route

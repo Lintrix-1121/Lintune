@@ -9,9 +9,17 @@ db.user = require('./user')(sequelize, Sequelize);
 db.tune = require('./song')(sequelize, Sequelize);
 db.tuneEvent = require('./tuneEvent')(sequelize, Sequelize);
 
+db.subscriptionPlan = require('./subscriptionPlans')(sequelize, Sequelize);
+db.subscription = require('./subscriptions')(sequelize, Sequelize);
+db.payment = require('./payments')(sequelize, Sequelize);
+
 const User = db.user;
 const Tune = db.tune;
 const TuneEvent = db.tuneEvent;
+
+const SubscriptionPlan = db.subscriptionPlan;
+const Subscription = db.subscription;
+const Payment = db.payment;
 
 User.hasMany(Tune, {
     foreignKey: 'owner_id',
@@ -36,10 +44,36 @@ TuneEvent.belongsTo(Tune, {
 });
 
 User.hasMany(TuneEvent, {
-    foreignKey: 'user_id'
+    foreignKey: 'userId'
 });
 TuneEvent.belongsTo(User, {
-    foreignKey: 'user_id'
-})
+    foreignKey: 'userId'
+});
+
+SubscriptionPlan.hasMany(Subscription, {
+    foreignKey: 'planId',
+    as: 'subscriptions'
+});
+Subscription.belongsTo(SubscriptionPlan, {
+    foreignKey: 'planId',
+    as: 'plan'
+});
+User.hasMany(Subscription, {
+    foreignKey: 'userId',
+    as: 'subscriptions'
+});
+Subscription.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+Subscription.hasMany(Payment, {
+    foreignKey: 'subscriptionId',
+    as: 'payments'
+});
+Payment.belongsTo(Subscription, {
+    foreignKey: 'subscriptionId',
+    as: 'subscription'
+});
+
 
 module.exports = db;
