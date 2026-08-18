@@ -1,82 +1,112 @@
-module.exports = (sequelize, Sequelize) => {
-    const Subscription = sequelize.define('subscriptions', {
-        id: {
-            type: Sequelize.UUID,
-            defaultValue: Sequelize.UUIDV4,
-            primaryKey: true,
-            allowNull: false
-        },
+const { DataTypes } = require('sequelize');
 
-        userId: {
-            type: Sequelize.INTEGER,
-            allowNull: false
-        },
+module.exports = (sequelize) => {
+    const Subscription = sequelize.define(
+        'Subscription',
+        {
+            id: {
+                type: DataTypes.UUID,
+                defaultValue: DataTypes.UUIDV4,
+                primaryKey: true,
+                allowNull: false
+            },
 
-        planId: {
-            type: Sequelize.UUID,
-            allowNull: false
-        },
+            userId: {
+                type: DataTypes.INTEGER,
+                allowNull: false
+            },
 
-        status: {
-            type: Sequelize.ENUM(
-                'trialing',
-                'pending',
-                'active',
-                'past_due',
-                'cancelled',
-                'expired'
-            ),
-            allowNull: false,
-            defaultValue: 'trialing'
-        },
+            planId: {
+                type: DataTypes.UUID,
+                allowNull: false
+            },
 
-        trialStart: {
-            type: Sequelize.DATE,
-            allowNull: true
-        },
+            status: {
+                type: DataTypes.ENUM(
+                    'trialing',
+                    'active',
+                    'past_due',
+                    'paused',
+                    'cancelled',
+                    'expired'
+                ),
+                allowNull: false,
+                defaultValue: 'trialing'
+            },
 
-        trialEnd: {
-            type: Sequelize.DATE,
-            allowNull: true
-        },
+            trialStart: {
+                type: DataTypes.DATE,
+                allowNull: true
+            },
 
-        currentPeriodStart: {
-            type: Sequelize.DATE,
-            allowNull: false
-        },
+            trialEnd: {
+                type: DataTypes.DATE,
+                allowNull: true
+            },
 
-        currentPeriodEnd: {
-            type: Sequelize.DATE,
-            allowNull: false
-        },
+            currentPeriodStart: {
+                type: DataTypes.DATE,
+                allowNull: true
+            },
 
-        provider: {
-            type: Sequelize.STRING,
-            allowNull: true
-        },
+            currentPeriodEnd: {
+                type: DataTypes.DATE,
+                allowNull: true
+            },
 
-        providerCustomerId: {
-            type: Sequelize.STRING,
-            allowNull: true
-        },
+            provider: {
+                type: DataTypes.STRING(50),
+                allowNull: false,
+                defaultValue: 'dgateway'
+            },
 
-        providerSubscriptionId: {
-            type: Sequelize.STRING,
-            allowNull: true
-        },
+            providerCustomerId: {
+                type: DataTypes.STRING(255),
+                allowNull: true
+            },
 
-        cancelAtPeriodEnd: {
-            type: Sequelize.BOOLEAN,
-            allowNull: false,
-            defaultValue: false
-        },
+            providerSubscriptionId: {
+                type: DataTypes.STRING(255),
+                allowNull: true,
+                unique: true
+            },
 
-        cancelledAt: {
-            type: Sequelize.DATE,
-            allowNull: true
+            customerPhone: {
+                type: DataTypes.STRING(20),
+                allowNull: false
+            },
+
+            cancelAtPeriodEnd: {
+                type: DataTypes.BOOLEAN,
+                allowNull: false,
+                defaultValue: false
+            },
+
+            canceledAt: {
+                type: DataTypes.DATE,
+                allowNull: true
+            }
+        },
+        {
+            tableName: 'subscriptions',
+            timestamps: true,
+            indexes: [
+                {
+                    fields: ['userId']
+                },
+                {
+                    fields: ['status']
+                },
+                {
+                    unique: true,
+                    fields: ['userId'],
+                    name: 'unique_active_user_subscription'
+                }
+            ]
         }
-
-    });
+    );
 
     return Subscription;
 };
+
+

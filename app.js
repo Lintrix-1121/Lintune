@@ -7,6 +7,7 @@ const authenticate = require('./middleware/jwtAuth');
 
 const app = express();
 
+const startSubscriptionJob = require('./middleware/subscriptionJob');
 
 
 // CORS Configuration BEFORE other middleware
@@ -98,6 +99,7 @@ const { verify } = require('jsonwebtoken');
 const SubscriptionPlanController = require('./controllers/subscriptionPlanController');
 const SubscriptionController = require('./controllers/subscriptionController');
 const PaymentsController = require('./controllers/paymentController');
+const requireActiveSubscrption = require('./middleware/requireActiveSubscrption');
 
 const authController = new AuthController(User);
 const userController = new UserController(User);
@@ -115,7 +117,7 @@ const paymentController = new PaymentsController(
   Payments, Subscription, SubscriptionPlan
 );
 
-const subscriptionGuard = require('./middleware/requireActiveSubscrption')(
+const requireSubscription = require('./middleware/requireActiveSubscrption')(
   Subscription
 );
 
@@ -124,10 +126,10 @@ const subscriptionGuard = require('./middleware/requireActiveSubscrption')(
 app.use('/auth', require('./routes/authRoutes')(authController));
 app.use('/users', require('./routes/userRoutes')(userController));
 app.use('/upload', 
-  authenticate, subscriptionGuard,
+  authenticate, requireSubscription,
   require('./routes/uploadRoutes')(uploadController));
-app.use('/dold', require('./routes/downloadRoutes')(downloadController));
-app.use('/tune', require('./routes/tuneRoutes'));
+app.use('/dold', authenticate, requireSubscription, require('./routes/downloadRoutes')(downloadController));
+app.use('/tune', authenticate, requireSubscription, require('./routes/tuneRoutes'));
 
 app.use('/subscription-plans', require('./routes/subscriptionnPlanRoutes')(
   subscriptionPlanController, authenticate
@@ -182,6 +184,8 @@ async function startServer() {
     // Sync models (create tables if they don't exist)
     await sequelize.sync({ force: false });
     console.log('Database synced successfully.');
+
+    startSubscriptionJob({ Subscription, SubscriptionPlan, Payments });
     
     // Start server
     app.listen(PORT, () => {

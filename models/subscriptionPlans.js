@@ -1,52 +1,77 @@
-module.exports = (sequelize, Sequelize) => {
-    const SubscriptionPlan = sequelize.define('subscriptionPlans', {
-        id: {
-            type: Sequelize.UUID,
-            defaultValue: Sequelize.UUIDV4,
-            primaryKey: true,
-            allowNull: false
-        },
+const { DataTypes } = require('sequelize');
 
-        name: {
-            type: Sequelize.STRING,
-            allowNull: false
-        },
+module.exports = (sequelize) => {
+    const SubscriptionPlan = sequelize.define(
+        'SubscriptionPlan',
+        {
+            id: {
+                type: DataTypes.UUID,
+                defaultValue: DataTypes.UUIDV4,
+                primaryKey: true,
+                allowNull: false
+            },
 
-        description: {
-            type: Sequelize.TEXT,
-            allowNull: true
-        },
+            name: {
+                type: DataTypes.STRING(100),
+                allowNull: false
+            },
 
-        price: {
-            type: Sequelize.DECIMAL(10, 2),
-            allowNull: false,
-            defaultValue: 0
-        },
+            description: {
+                type: DataTypes.TEXT,
+                allowNull: true
+            },
 
-        currency: {
-            type: Sequelize.STRING(3),
-            allowNull: false,
-            defaultValue: 'UGX'
-        },
+            price: {
+                type: DataTypes.DECIMAL(10, 2),
+                allowNull: false
+            },
 
-        interval: {
-            type: Sequelize.ENUM('monthly', 'yearly'),
-            allowNull: false,
-            defaultValue: 'monthly'
-        },
+            currency: {
+                type: DataTypes.STRING(10),
+                allowNull: false,
+                defaultValue: 'UGX'
+            },
 
-        trialDays: {
-            type: Sequelize.INTEGER,
-            allowNull: false,
-            defaultValue: 14
-        },
+            interval: {
+                type: DataTypes.ENUM(
+                    'daily',
+                    'weekly',
+                    'monthly',
+                    'yearly'
+                ),
+                allowNull: false,
+                defaultValue: 'monthly'
+            },
 
-        isActive: {
-            type: Sequelize.BOOLEAN,
-            allowNull: false,
-            defaultValue: true
+            trialDays: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 14
+            },
+
+            graceDays: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+                defaultValue: 3
+            },
+
+            dgatewayPlanId: {
+                type: DataTypes.STRING,
+                allowNull: true,
+                unique: true
+            },
+
+            isActive: {
+                type: DataTypes.BOOLEAN,
+                allowNull: false,
+                defaultValue: true
+            }
+        },
+        {
+            tableName: 'subscription_plans',
+            timestamps: true
         }
-    });
+    );
 
     return SubscriptionPlan;
 };

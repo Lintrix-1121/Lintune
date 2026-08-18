@@ -1,5 +1,10 @@
-const axios = require('axios');
-const crypto = require('crypto');
+const {
+    createSubscription,
+    cancelSubscription,
+    pauseSubscription,
+    resumeSubscription,
+    chargeSubscription
+} = require('../utils/dgateway');
 
 class SubscriptionController {
     constructor(
@@ -14,9 +19,8 @@ class SubscriptionController {
         this.User = User;
     }
 
-    // GET CURRENT SUBSCRIPTION
-    getCurrentSubscription = async (req, res) => {
-
+    // GET /subscriptions/me
+    getMySubscription = async (req, res) => {
         try {
             const userId = req.user.userId;
             const subscription =
@@ -26,7 +30,8 @@ class SubscriptionController {
                     },
                     include: [
                         {
-                            model: this.SubscriptionPlan,
+                            model:
+                                this.SubscriptionPlan,
                             as: 'plan'
                         }
                     ],
@@ -35,13 +40,28 @@ class SubscriptionController {
                     ]
                 });
             if (!subscription) {
+
                 return res.json({
                     success: true,
+                    subscribed: false,
                     data: null
+                });
+            }
+            // Local trial expiration protection
+            if (
+                subscription.status === 'trialing' &&
+                subscription.trialEnd &&
+                new Date(subscription.trialEnd) <= new Date()
+            ) {
+                await subscription.update({
+                    status: 'past_due'
                 });
             }
             return res.json({
                 success: true,
+                subscribed:
+                    ['trialing', 'active']
+                        .includes(subscription.status),
                 data: subscription
             });
         } catch (error) {
@@ -51,122 +71,48 @@ class SubscriptionController {
             );
             return res.status(500).json({
                 success: false,
-                message: 'Unable to retrieve subscription'
-            });
-        }
-    };
-  
-    // START 14 DAY TRIAL
-    startTrial = async (req, res) => {
-        try {
-            const userId = req.user.userId;
-            const {
-                planId
-            } = req.body;
-            if (!planId) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'planId is required'
-                });
-            }
-            // Find plan
-            const plan =
-                await this.SubscriptionPlan.findOne({
-                    where: {
-                        id: planId,
-                        isActive: true
-                    }
-                });
-            if (!plan) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Subscription plan not found'
-                });
-            }
-
-            // Check existing subscription
-            const existing =
-                await this.Subscription.findOne({
-                    where: {
-                        userId
-                    },
-                    order: [
-                        ['createdAt', 'DESC']
-                    ]
-                });
-            if (existing) {
-                const activeStatuses = [
-                    'trialing',
-                    'active',
-                    'past_due'
-                ];
-                if (
-                    activeStatuses.includes(
-                        existing.status
-                    )
-                ) {
-                    return res.status(400).json({
-                        success: false,
-                        message:
-                            'You already have an active subscription'
-                    });
-                }
-            }
-
-            const now = new Date();
-            const trialEnd = new Date(now);
-            trialEnd.setDate(
-                trialEnd.getDate() +
-                Number(plan.trialDays || 14)
-            );
-
-            // Create subscription
-            const subscription =
-                await this.Subscription.create({
-                    userId,
-                    planId,
-                    status: 'trialing',
-                    trialStart: now,
-                    trialEnd,
-                    currentPeriodStart: now,
-                    currentPeriodEnd: trialEnd,
-                    provider: null,
-                    providerCustomerId: null,
-                    providerSubscriptionId: null,
-                    cancelAtPeriodEnd: false,
-                    cancelledAt: null
-                });
-            return res.status(201).json({
-                success: true,
                 message:
-                    `${plan.trialDays || 14}-day trial started`,
-                data: subscription
-            });
-        } catch (error) {
-            console.error(
-                'Start trial error:',
-                error
-            );
-            return res.status(500).json({
-                success: false,
-                message: error.message
+                    'Unable to retrieve subscription'
             });
         }
     };
 
-    // CREATE FLUTTERWAVE PAYMENT
-    createPayment = async (req, res) => {
+    // POST /subscriptions, Starts a 14-day trial.
+    createSubscription = async (req, res) => {
         try {
             const userId = req.user.userId;
             const {
                 planId,
-                phoneNumber,
-                network
+                phone,
+                provider = 'iotec'
             } = req.body;
-            if (!planId) {
+            if (!planId || !phone) {
                 return res.status(400).json({
                     success: false,
-                    message: 'planId is required'
+                    message:
+                        'planId and phone are required'
+                });
+            }
+
+            // Making sure user doesn't already have
+            // an active/trialing subscription
+            const existing =
+                await this.Subscription.findOne({
+                    where: {
+                        userId,
+                        status: [
+                            'trialing',
+                            'active',
+                            'past_due'
+                        ]
+                    }
+                });
+            if (existing) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'You already have a subscription',
+                    data: existing
                 });
             }
             const plan =
@@ -179,14 +125,8 @@ class SubscriptionController {
             if (!plan) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Subscription plan not found'
-                });
-            }
-            if (Number(plan.price) <= 0) {
-                return res.status(400).json({
-                    success: false,
                     message:
-                        'This plan does not require payment'
+                        'Subscription plan not found'
                 });
             }
             const user =
@@ -197,133 +137,104 @@ class SubscriptionController {
                     message: 'User not found'
                 });
             }
-            const reference =
-                `SUB-${userId}-${Date.now()}-${crypto
-                    .randomBytes(5)
-                    .toString('hex')}`;
-
-
-            // Create pending subscription
             const now = new Date();
-            const periodEnd =
+            const trialEnd =
                 new Date(now);
-            if (plan.interval === 'yearly') {
-                periodEnd.setFullYear(
-                    periodEnd.getFullYear() + 1
-                );
-            } else {
-                periodEnd.setMonth(
-                    periodEnd.getMonth() + 1
-                );
-            }
+            trialEnd.setDate(
+                trialEnd.getDate() +
+                Number(plan.trialDays || 14)
+            );
+
+            // Create DGateway subscription.
+            // start_now=false meaning  don't immediately
+            // charge the user.
+            const gatewaySubscription =
+                await createSubscription({
+                    planId:
+                        plan.dgatewayPlanId,
+                    customerEmail:
+                        user.email,
+                    customerName:
+                        user.name ||
+                        user.username ||
+                        user.email,
+                    customerPhone:
+                        phone,
+                    provider,
+                    startNow: false,
+                    metadata: {
+                        userId: String(userId),
+                        localPlanId:
+                            String(plan.id)
+                    }
+                });
+            const gatewayData =
+                gatewaySubscription?.data || {};
             const subscription =
                 await this.Subscription.create({
                     userId,
-                    planId,
-                    status: 'past_due',
-                    trialStart: null,
-                    trialEnd: null,
-                    currentPeriodStart: now,
-                    currentPeriodEnd: periodEnd,
-                    provider: 'flutterwave',
-                    providerCustomerId: null,
-                    providerSubscriptionId: null,
-                    cancelAtPeriodEnd: false
+                    planId:
+                        plan.id,
+                    status:
+                        'trialing',
+                    trialStart:
+                        now,
+                    trialEnd,
+                    currentPeriodStart:
+                        now,
+                    currentPeriodEnd:
+                        trialEnd,
+                    provider:
+                        'dgateway',
+                    providerCustomerId:
+                        gatewayData.customer_id
+                            ? String(
+                                gatewayData.customer_id
+                            )
+                            : null,
+                    providerSubscriptionId:
+                        gatewayData.id
+                            ? String(gatewayData.id)
+                            : null,
+                    customerPhone:
+                        phone,
+                    cancelAtPeriodEnd:
+                        false
                 });
-
-            // Record pending payment
-            await this.Payments.create({
-                userId,
-                subscriptionId:
-                    subscription.id,
-                provider: 'flutterwave',
-                providerTransactionId: null,
-                reference,
-                amount: plan.price,
-                currency: plan.currency,
-                status: 'pending',
-                paidAt: null
-            });
-
-            // Flutterwave Uganda Mobile Money
-            if (
-                phoneNumber &&
-                network
-            ) {
-                const response =
-                    await axios.post(
-                        'https://api.flutterwave.com/v3/charges?type=mobile_money_uganda',
-                        {
-                            amount: Number(plan.price),
-                            currency: plan.currency,
-                            email: user.email,
-                            phone_number: phoneNumber,
-                            network: network,
-                            tx_ref: reference,
-                            fullname:
-                                user.name ||
-                                user.username ||
-                                user.email,
-                            meta: {
-                                userId,
-                                subscriptionId:
-                                    subscription.id,
-                                planId
-                            }
-                        },
-                        {
-                            headers: {
-                                Authorization:
-                                    `Bearer ${process.env.FLW_SECRET_KEY}`,
-                                'Content-Type':
-                                    'application/json'
-                            }
-                        }
-                    );
-                return res.status(200).json({
-                    success: true,
-                    message:
-                        'Payment initiated',
-                    data: response.data
-                });
-            }
-            // No mobile money details, implement Flutterwave
-            //  hosted checkout here.
-            return res.status(400).json({
-                success: false,
+            return res.status(201).json({
+                success: true,
                 message:
-                    'phoneNumber and network are required for Uganda Mobile Money'
+                    `Subscription started. You have ${plan.trialDays || 14} free days.`,
+                data: subscription
             });
+
         } catch (error) {
             console.error(
-                'Flutterwave payment error:',
-                error.response?.data ||
-                error.message
+                'Create subscription error:',
+                error
             );
-            return res.status(500).json({
+            return res.status(
+                error.status || 500
+            ).json({
                 success: false,
                 message:
-                    'Unable to initiate payment',
-                error:
-                    error.response?.data ||
-                    error.message
+                    error.message ||
+                    'Unable to create subscription'
             });
         }
     };
 
-    // CANCEL SUBSCRIPTION, /subscriptions/cancel
-    cancelSubscription = async (req, res) => {
+    // POST /subscriptions/:id/cancel
+    cancel = async (req, res) => {
         try {
             const userId =
                 req.user.userId;
             const subscription =
                 await this.Subscription.findOne({
                     where: {
+                        id: req.params.id,
                         userId
-                    },
-                    order: [
-                        ['createdAt', 'DESC']
-                    ]
+                    }
                 });
             if (!subscription) {
                 return res.status(404).json({
@@ -333,25 +244,24 @@ class SubscriptionController {
                 });
             }
             if (
-                ![
-                    'trialing',
-                    'active'
-                ].includes(subscription.status)
+                subscription.providerSubscriptionId
             ) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        'Subscription is not active'
-                });
+                await cancelSubscription(
+                    subscription.providerSubscriptionId
+                );
             }
             await subscription.update({
-                cancelAtPeriodEnd: true,
-                cancelledAt: new Date()
+                status:
+                    'cancelled',
+                cancelAtPeriodEnd:
+                    true,
+                canceledAt:
+                    new Date()
             });
             return res.json({
                 success: true,
                 message:
-                    'Subscription will be cancelled at the end of the current period',
+                    'Subscription cancelled',
                 data: subscription
             });
         } catch (error) {
@@ -366,7 +276,84 @@ class SubscriptionController {
             });
         }
     };
+
+    // POST /subscriptions/:id/pause
+    pause = async (req, res) => {
+        try {
+            const subscription =
+                await this.Subscription.findOne({
+                    where: {
+                        id: req.params.id,
+                        userId:
+                            req.user.userId
+                    }
+                });
+            if (!subscription) {
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        'Subscription not found'
+                });
+            }
+            await pauseSubscription(
+                subscription.providerSubscriptionId
+            );
+            await subscription.update({
+                status: 'paused'
+            });
+            return res.json({
+                success: true,
+                message:
+                    'Subscription paused'
+            });
+        } catch (error) {
+            return res.status(500).json({
+                success: false,
+                message:
+                    'Unable to pause subscription'
+            });
+        }
+    };
+
+    // POST /subscriptions/:id/resume
+    resume = async (req, res) => {
+        try {
+            const subscription =
+                await this.Subscription.findOne({
+                    where: {
+                        id: req.params.id,
+                        userId:
+                            req.user.userId
+                    }
+                });
+            if (!subscription) {
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        'Subscription not found'
+                });
+            }
+            await resumeSubscription(
+                subscription.providerSubscriptionId
+            );
+            await subscription.update({
+                status: 'active'
+            });
+            return res.json({
+                success: true,
+                message:
+                    'Subscription resumed'
+            });
+        } catch (error) {
+            return res.status(500).json({
+                success: false,
+                message:
+                    'Unable to resume subscription'
+            });
+        }
+    };
 }
+
 
 module.exports = SubscriptionController;
 

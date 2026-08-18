@@ -1,65 +1,93 @@
-module.exports = (sequelize, Sequelize) => {
-    const Payments = sequelize.define('payments', {
-        id: {
-            type: Sequelize.UUID,
-            defaultValue: Sequelize.UUIDV4,
-            primaryKey: true,
-            allowNull: false
-        },
+const { DataTypes } = require('sequelize');
 
-        userId: {
-            type: Sequelize.INTEGER,
-            allowNull: false
-        },
+module.exports = (sequelize) => {
+    const Payments = sequelize.define(
+        'Payments',
+        {
+            id: {
+                type: DataTypes.UUID,
+                defaultValue: DataTypes.UUIDV4,
+                primaryKey: true,
+                allowNull: false
+            },
 
-        subscriptionId: {
-            type: Sequelize.UUID,
-            allowNull: false
-        },
+            userId: {
+                type: DataTypes.INTEGER,
+                allowNull: false
+            },
 
-        provider: {
-            type: Sequelize.STRING,
-            allowNull: false
-        },
+            subscriptionId: {
+                type: DataTypes.UUID,
+                allowNull: true
+            },
 
-        providerTransactionId: {
-            type: Sequelize.STRING,
-            allowNull: true
-        },
+            provider: {
+                type: DataTypes.STRING(50),
+                allowNull: false,
+                defaultValue: 'dgateway'
+            },
 
-        reference: {
-            type: Sequelize.STRING,
-            allowNull: false,
-            unique: true
-        },
+            providerTransactionId: {
+                type: DataTypes.STRING(255),
+                allowNull: true
+            },
 
-        amount: {
-            type: Sequelize.DECIMAL(10, 2),
-            allowNull: false
-        },
+            reference: {
+                type: DataTypes.STRING(255),
+                allowNull: false,
+                unique: true
+            },
 
-        currency: {
-            type: Sequelize.STRING(3),
-            allowNull: false
-        },
+            amount: {
+                type: DataTypes.DECIMAL(10, 2),
+                allowNull: false
+            },
 
-        status: {
-            type: Sequelize.ENUM(
-                'pending',
-                'successful',
-                'failed',
-                'cancelled'
-            ),
-            allowNull: false,
-            defaultValue: 'pending'
-        },
+            currency: {
+                type: DataTypes.STRING(10),
+                allowNull: false,
+                defaultValue: 'UGX'
+            },
 
-        paidAt: {
-            type: Sequelize.DATE,
-            allowNull: true
+            provider: {
+                type: DataTypes.STRING(50),
+                allowNull: false,
+                defaultValue: 'dgateway'
+            },
+
+            paymentMethod: {
+                type: DataTypes.ENUM(
+                    'mtn',
+                    'airtel',
+                    'mobile_money',
+                    'card'
+                ),
+                allowNull: false,
+                defaultValue: 'mobile_money'
+            },
+
+            status: {
+                type: DataTypes.ENUM(
+                    'pending',
+                    'completed',
+                    'failed',
+                    'expired'
+                ),
+                allowNull: false,
+                defaultValue: 'pending'
+            },
+
+            paidAt: {
+                type: DataTypes.DATE,
+                allowNull: true
+            }
+        },
+        {
+            tableName: 'payments',
+            timestamps: true
         }
-
-    });
+    );
 
     return Payments;
 };
+

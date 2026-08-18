@@ -1,5 +1,7 @@
-const axios = require('axios');
-const crypto = require('crypto');
+const {
+    chargeSubscription,
+    verifyPayment
+} = require('../utils/dgateway');
 
 class PaymentsController {
     constructor(
@@ -9,44 +11,248 @@ class PaymentsController {
     ) {
         this.Payments = Payments;
         this.Subscription = Subscription;
-        this.SubscriptionPlan = SubscriptionPlan;
+        this.SubscriptionPlan =
+            SubscriptionPlan;
     }
+    
+    // POST /payments/subscribe
+    // Initiate payment for trial expiry, renewal
+     
+    initiateSubscriptionPayment =
+        async (req, res) => {
+            try {
+                const userId =
+                    req.user.userId;
+                const {
+                    subscriptionId,
+                    provider
+                } = req.body;
 
-    // VERIFY PAYMENT
-    // GET /payments/verify/:transactionId
-    verifyPayment = async (req, res) => {
-        try {
-            const {
-                transactionId
-            } = req.params;
+                const subscription =
+                    await this.Subscription.findOne({
+                        where: {
+                            id: subscriptionId,
+                            userId
+                        },
+                        include: [
+                            {
+                                model:
+                                    this.SubscriptionPlan,
+                                as: 'plan'
+                            }
+                        ]
+                    });
+                if (!subscription) {
+                    return res.status(404).json({
+                        success: false,
+                        message:
+                            'Subscription not found'
+                    });
+                }
+                if (
+                    ![
+                        'trialing',
+                        'past_due',
+                        'active'
+                    ].includes(
+                        subscription.status
+                    )
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            'Subscription cannot be charged'
+                    });
+                }
 
-            const response =
-                await axios.get(
+                const charge =
+                    await chargeSubscription({
+                        subscriptionId:
+                            subscription
+                                .providerSubscriptionId,
+                        phoneNumber:
+                            subscription
+                                .customerPhone,
+                        provider:
+                            provider ||
+                            process.env
+                                .DGATEWAY_DEFAULT_PROVIDER ||
+                            'iotec'
+                    });
 
-                    `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
-                    {
-                        headers: {
-                            Authorization:
-                                `Bearer ${process.env.FLW_SECRET_KEY}`
-                        }
+                const data =
+                    charge?.data || {};
+                if (!data.reference) {
+                    return res.status(502).json({
+                        success: false,
+                        message:
+                            'DGateway did not return a payment reference',
+                        data: charge
+                    });
+                }
+                const payment =
+                    await this.Payments.create({
+                        userId,
+                        subscriptionId:
+                            subscription.id,
+                        provider:
+                            'dgateway',
+                        providerTransactionId:
+                            data.id
+                                ? String(data.id)
+                                : null,
+                        reference:
+                            data.reference,
+                        amount:
+                            data.amount ||
+                            subscription.plan.price,
+                        currency:
+                            data.currency ||
+                            subscription.plan.currency,
+                        paymentMethod:
+                            provider === 'airtel'
+                                ? 'airtel'
+                                : provider === 'mtn'
+                                    ? 'mtn'
+                                    : 'mobile_money',
+                        status:
+                            'pending'
+                    });
+                return res.status(201).json({
+                    success: true,
+                    message:
+                        'Payment initiated. Please approve the Mobile Money prompt.',
+                    data: {
+                        payment,
+                        reference:
+                            data.reference,
+                        gateway:
+                            data
                     }
+                });
+            } catch (error) {
+                console.error(
+                    'Initiate payment error:',
+                    error
                 );
-
-            const data =
-                response.data.data;
-            if (!data) {
-                return res.status(400).json({
+                return res.status(
+                    error.status || 500
+                ).json({
                     success: false,
                     message:
-                        'Transaction verification failed'
+                        error.message ||
+                        'Unable to initiate payment'
                 });
             }
-            // Flutterwave verification succeeded
-            if (
-                data.status === 'successful'
-            ) {
+        };
+
+    // GET /payments/:reference
+    getPaymentStatus =
+        async (req, res) => {
+            try {
+                const payment =
+                    await this.Payments.findOne({
+                        where: {
+                            reference:
+                                req.params.reference,
+                            userId:
+                                req.user.userId
+                        }
+                    });
+                if (!payment) {
+                    return res.status(404).json({
+                        success: false,
+                        message:
+                            'Payment not found'
+                    });
+                }
+
+                const gatewayStatus =
+                    await verifyPayment(
+                        payment.reference
+                    );
+                const data =
+                    gatewayStatus?.data ||
+                    {};
+                let localStatus =
+                    payment.status;
+                if (
+                    data.status === 'completed' ||
+                    data.status === 'successful'
+                ) {
+                    localStatus =
+                        'completed';
+                } else if (
+                    data.status === 'failed'
+                ) {
+                    localStatus =
+                        'failed';
+                } else if (
+                    data.status === 'expired'
+                ) {
+                    localStatus =
+                        'expired';
+                }
+                if (
+                    localStatus !==
+                    payment.status
+                ) {
+                    await payment.update({
+                        status:
+                            localStatus,
+                        paidAt:
+                            localStatus ===
+                            'completed'
+                                ? new Date()
+                                : null
+                    });
+                }
+                return res.json({
+                    success: true,
+                    data: {
+                        payment,
+                        gateway:
+                            gatewayStatus
+                    }
+                });
+            } catch (error) {
+                console.error(
+                    'Payment status error:',
+                    error
+                );
+                return res.status(500).json({
+                    success: false,
+                    message:
+                        'Unable to verify payment'
+                });
+            }
+        };
+ 
+    // DGateway webhook, the exact webhook payload/signature shown in your DGateway dashboard before
+    // enabling production signature enforcement.
+    webhook =
+        async (req, res) => {
+            try {
+                console.log(
+                    'DGateway webhook:',
+                    JSON.stringify(
+                        req.body,
+                        null,
+                        2
+                    )
+                );
+                const event =
+                    req.body.event;
+                const data =
+                    req.body.data || {};
                 const reference =
-                    data.tx_ref;
+                    data.reference ||
+                    data.id;
+                if (!reference) {
+                    return res.status(200).json({
+                        received: true
+                    });
+                }
                 const payment =
                     await this.Payments.findOne({
                         where: {
@@ -54,282 +260,133 @@ class PaymentsController {
                         }
                     });
                 if (!payment) {
-                    return res.status(404).json({
-                        success: false,
-                        message:
-                            'Local payment record not found'
+                    console.warn(
+                        'Payment not found:',
+                        reference
+                    );
+                    return res.status(200).json({
+                        received: true
                     });
                 }
-                // Verify amount and currency
+                let status =
+                    payment.status;
                 if (
-                    Number(data.amount) !==
-                    Number(payment.amount)
+                    event ===
+                    'collection.completed' ||
+                    event ===
+                    'subscription.payment_completed' ||
+                    event ===
+                    'subscription.renewed' ||
+                    data.status === 'completed' ||
+                    data.status === 'successful'
                 ) {
-                    return res.status(400).json({
-                        success: false,
-                        message:
-                            'Payment amount mismatch'
-                    });
-                }
-                if (
-                    data.currency !==
-                    payment.currency
+                    status =
+                        'completed';
+                } else if (
+                    event ===
+                    'collection.failed' ||
+                    data.status === 'failed'
                 ) {
-                    return res.status(400).json({
-                        success: false,
-                        message:
-                            'Payment currency mismatch'
-                    });
+                    status =
+                        'failed';
+                } else if (
+                    event ===
+                    'collection.expired' ||
+                    data.status === 'expired'
+                ) {
+                    status =
+                        'expired';
                 }
                 await payment.update({
+                    status,
                     providerTransactionId:
-                        String(data.id),
-                    status:
-                        'successful',
+                        data.id
+                            ? String(data.id)
+                            : payment
+                                .providerTransactionId,
                     paidAt:
-                        new Date()
+                        status === 'completed'
+                            ? new Date()
+                            : payment.paidAt
                 });
-                const subscription =
-                    await this.Subscription.findByPk(
-                        payment.subscriptionId
-                    );
-                if (subscription) {
-                    await subscription.update({
-                        status: 'active',
-                        // providerTransactionId:
-                        //     undefined
-                    });
-                }
-            }
-            return res.json({
-                success: true,
-                data
-            });
-        } catch (error) {
-            console.error(
-                'Payment verification error:',
-                error.response?.data ||
-                error.message
-            );
-            return res.status(500).json({
-                success: false,
-                message:
-                    'Payment verification failed'
-            });
-        }
-    };
 
-    // FLUTTERWAVE WEBHOOK
-    // POST /payments/webhook
-    webhook = async (req, res) => {
-        try {
-            const signature =
-                req.headers['flutterwave-signature'];
-            const secretHash =
-                process.env.FLW_SECRET_HASH;
-            // New Flutterwave webhook signature
-            if (signature) {
-                const rawBody =
-                    req.rawBody;
-                if (!rawBody) {
-                    return res.status(400).send(
-                        'Missing raw body'
-                    );
-                }
-                const expected =
-                    crypto
-                        .createHmac(
-                            'sha256',
-                            secretHash
-                        )
-                        .update(rawBody)
-                        .digest('base64');
+                // Successful payment gives the subscription access.
                 if (
-                    signature !== expected
+                    status === 'completed'
                 ) {
-                    return res.status(401).send(
-                        'Invalid signature'
-                    );
-                }
-            } else {
-
-                // Flutterwave webhook configuration 4 Compatibility with older
-                  const oldSignature =
-                    req.headers['verif-hash'];
-                if (
-                    !oldSignature ||
-                    oldSignature !== secretHash
-                ) {
-                    return res.status(401).send(
-                        'Invalid webhook signature'
-                    );
-                }
-            }
-            const payload =
-                req.body;
-            console.log(
-                'Flutterwave webhook:',
-                JSON.stringify(payload)
-            );
-
-            // Acknowledge Flutterwave quickly
-            res.sendStatus(200);
-            // Process payment
-            const data =
-                payload.data;
-            if (!data) {
-                return;
-            }
-            const reference =
-                data.reference ||
-                data.tx_ref;
-            if (!reference) {
-                return;
-            }
-            const payment =
-                await this.Payments.findOne({
-                    where: {
-                        reference
-                    }
-                });
-            if (!payment) {
-                console.warn(
-                    'Payment not found:',
-                    reference
-                );
-                return;
-            }
-            // Prevent duplicate processing
-            if (
-                payment.status ===
-                'successful'
-            ) {
-                return;
-            }
-            // Successful payment
-            if (
-                data.status ===
-                'succeeded' ||
-                data.status ===
-                'successful'
-            ) {
-                // Verify the transaction with Flutterwave before granting access.
-                const verification =
-                    await axios.get(
-                        `https://api.flutterwave.com/v3/transactions/${data.id}/verify`,
-                        {
-                            headers: {
-                                Authorization:
-                                    `Bearer ${process.env.FLW_SECRET_KEY}`
-                            }
+                    const subscription =
+                        await this.Subscription.findByPk(
+                            payment.subscriptionId
+                        );
+                    if (subscription) {
+                        const now =
+                            new Date();
+                        const plan =
+                            await this
+                                .SubscriptionPlan
+                                .findByPk(
+                                    subscription.planId
+                                );
+                        const periodEnd =
+                            new Date(now);
+                        if (
+                            plan.interval ===
+                            'monthly'
+                        ) {
+                            periodEnd.setMonth(
+                                periodEnd.getMonth() +
+                                1
+                            );
+                        } else if (
+                            plan.interval ===
+                            'yearly'
+                        ) {
+                            periodEnd.setFullYear(
+                                periodEnd.getFullYear() +
+                                1
+                            );
+                        } else if (
+                            plan.interval ===
+                            'weekly'
+                        ) {
+                            periodEnd.setDate(
+                                periodEnd.getDate() +
+                                7
+                            );
+                        } else {
+                            periodEnd.setDate(
+                                periodEnd.getDate() +
+                                1
+                            );
                         }
-                    );
-                const verified =
-                    verification.data.data;
-                if (
-                    verified.status !==
-                    'successful'
-                ) {
-                    return;
-                }
-                if (
-                    Number(verified.amount) !==
-                    Number(payment.amount)
-                ) {
-                    console.error(
-                        'Amount mismatch for:',
-                        reference
-                    );
-                    return;
-                }
-                if (
-                    verified.currency !==
-                    payment.currency
-                ) {
-                    console.error(
-                        'Currency mismatch for:',
-                        reference
-                    );
-                    return;
-                }
-                await payment.update({
-                    providerTransactionId:
-                        String(verified.id),
-                    status:
-                        'successful',
-                    paidAt:
-                        new Date()
-                });
-                const subscription =
-                    await this.Subscription.findByPk(
-                        payment.subscriptionId
-                    );
-                if (!subscription) {
-                    return;
-                }
-                const plan =
-                    await this.SubscriptionPlan.findByPk(
-                        subscription.planId
-                    );
-                if (!plan) {
-                    return;
-                }
-                const start =
-                    new Date();
-                const end =
-                    new Date(start);
-                if (
-                    plan.interval ===
-                    'yearly'
-                ) {
-                    end.setFullYear(
-                        end.getFullYear() + 1
-                    );
-                } else {
-                    end.setMonth(
-                        end.getMonth() + 1
-                    );
-                }
-                await subscription.update({
-                    status: 'active',
-                    currentPeriodStart:
-                        start,
-                    currentPeriodEnd:
-                        end
-                });
-                console.log(
-                    `Subscription ${subscription.id} activated`
-                );
-            } else if (
-                data.status ===
-                'failed'
-            ) {
-                await payment.update({
-                    status: 'failed'
-                });
-                await this.Subscription.update(
-                    {
-                        status: 'past_due'
-                    },
-                    {
-                        where: {
-                            id:
-                                payment.subscriptionId
-                        }
+                        await subscription.update({
+                            status:
+                                'active',
+                            currentPeriodStart:
+                                now,
+                            currentPeriodEnd:
+                                periodEnd
+                        });
                     }
+                }
+                return res.status(200).json({
+                    received: true
+                });
+            } catch (error) {
+                console.error(
+                    'DGateway webhook error:',
+                    error
                 );
+
+                /*
+                  Return 200 only if you intentionally want to acknowledge the webhook.
+                  For production, shld be based on DGateway's retry behavior.
+                 */
+                return res.status(200).json({
+                    received: true
+                });
             }
-        } catch (error) {
-            console.error(
-                'Webhook processing error:',
-                error.response?.data ||
-                error.message
-            );
-            // Log error for investigation.
-        }
-    };
+        };
 }
 
 module.exports = PaymentsController;
-
-

@@ -1,93 +1,63 @@
-const requireActiveSubscription = (
-    Subscription
-) => {
-
+module.exports = (Subscription) => {
     return async (req, res, next) => {
-
         try {
-
             const userId =
-                req.user.userId ||
-                req.user.id;
+                req.user.userId;
 
-            const subscription =
+                const subscription =
                 await Subscription.findOne({
-
                     where: {
                         userId,
                         status: [
                             'trialing',
                             'active'
                         ]
-                    },
-
-                    order: [
-                        ['createdAt', 'DESC']
-                    ]
-
+                    }
                 });
-
 
             if (!subscription) {
-
                 return res.status(403).json({
-
                     success: false,
-
+                    code:
+                        'SUBSCRIPTION_REQUIRED',
                     message:
                         'An active subscription is required'
-
                 });
-
             }
-
-
-            /*
-             * Check trial expiry
-             */
 
             if (
                 subscription.status ===
                 'trialing' &&
-                new Date() >
-                new Date(subscription.trialEnd)
+                subscription.trialEnd &&
+                new Date(
+                    subscription.trialEnd
+                ) <= new Date()
             ) {
-
-                subscription.status =
-                    'expired';
-
-                await subscription.save();
-
-                return res.status(403).json({
-
-                    success: false,
-
-                    message:
-                        'Your trial has expired'
-
+                await subscription.update({
+                    status:
+                        'past_due'
                 });
-
+                return res.status(403).json({
+                    success: false,
+                    code:
+                        'SUBSCRIPTION_EXPIRED',
+                    message:
+                        'Your free trial has expired'
+                });
             }
-
-
             next();
-
         } catch (error) {
-
-            console.error(error);
+            console.error(
+                'Subscription middleware:',
+                error
+            );
 
             return res.status(500).json({
-
                 success: false,
-
                 message:
                     'Unable to verify subscription'
-
             });
         }
-
     };
 };
 
-module.exports =
-    requireActiveSubscription;

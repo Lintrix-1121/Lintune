@@ -1,21 +1,19 @@
-module.exports = (
-    paymentsController,
-    authenticate
-) => {
-    const express = require('express');
+const express = require('express');
+
+module.exports = (paymentsController, authenticate) => {
     const router = express.Router();
 
-    //Flutterwave webhook authentication
     router.post(
-        '/webhook',
-        paymentsController.webhook
+        '/subscribe', authenticate, paymentsController.initiateSubscriptionPayment
     );
 
-    // Manual transaction verification
     router.get(
-        '/verify/:transactionId',
-        authenticate,
-        paymentsController.verifyPayment
+        '/:reference', authenticate, paymentsController.getPaymentStatus
+    );
+
+    // DGateway webhook with no user's JWT/authenticate
+    router.post(
+        '/webhook/dgateway', paymentsController.webhook
     );
 
     return router;

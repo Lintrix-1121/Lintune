@@ -1,36 +1,27 @@
-module.exports = (
-    subscriptionController,
-    authenticate
-) => {
-    const express = require('express');
+const express = require('express');
+
+module.exports = (subscriptionController, authenticate) => {
     const router = express.Router();
 
-    // Get current subscription
-    router.get(
-        '/current',
-        authenticate,
-        subscriptionController.getCurrentSubscription
+        router.get(
+        '/me', authenticate, subscriptionController.getMySubscription
     );
 
-    // Start 14-day trial
     router.post(
-        '/trial',
-        authenticate,
-        subscriptionController.startTrial
+        '/', authenticate, subscriptionController.createSubscription
     );
 
-    // Start payment
     router.post(
-        '/pay',
-        authenticate,
-        subscriptionController.createPayment
+        '/:id/cancel', authenticate, subscriptionController.cancel
     );
 
-    // Cancel at period end
+
     router.post(
-        '/cancel',
-        authenticate,
-        subscriptionController.cancelSubscription
+        '/:id/pause', authenticate, subscriptionController.pause
+    );
+
+    router.post(
+        '/:id/resume', authenticate, subscriptionController.resume
     );
 
     return router;

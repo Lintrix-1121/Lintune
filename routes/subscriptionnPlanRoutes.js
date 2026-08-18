@@ -1,39 +1,27 @@
-module.exports = (
-    controller,
-    authenticate
-) => {
-    const express = require('express');
+const express = require('express');
+
+module.exports = (subscriptionPlanController) => {
     const router = express.Router();
 
-    // Public
     router.get(
-        '/',
-        controller.getPlans
+        '/', subscriptionPlanController.getPlans
     );
 
     router.get(
-        '/:id',
-        controller.getPlan
+        '/:id', subscriptionPlanController.getPlan
     );
 
-   
-    // authenticate shown 4 admin-only
+    //admin middleware
     router.post(
-        '/',
-        authenticate,
-        controller.createPlan
+        '/', subscriptionPlanController.createPlan
     );
 
     router.put(
-        '/:id',
-        authenticate,
-        controller.updatePlan
+        '/:id', subscriptionPlanController.updatePlan
     );
 
     router.delete(
-        '/:id',
-        authenticate,
-        controller.deletePlan
+        '/:id', subscriptionPlanController.deactivatePlan
     );
 
     return router;

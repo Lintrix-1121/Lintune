@@ -1,3 +1,5 @@
+const { createPlan } = require('../utils/dgateway');
+
 class SubscriptionPlanController {
     constructor(SubscriptionPlan) {
         this.SubscriptionPlan = SubscriptionPlan;
@@ -6,29 +8,32 @@ class SubscriptionPlanController {
     // GET /subscription-plans
     getPlans = async (req, res) => {
         try {
-            const plans = await this.SubscriptionPlan.findAll({
-                where: {
-                    isActive: true
-                },
-                order: [['price', 'ASC']]
-            });
-            return res.status(200).json({
+            const plans =
+                await this.SubscriptionPlan.findAll({
+                    where: {
+                        isActive: true
+                    },
+                    order: [
+                        ['price', 'ASC']
+                    ]
+                });
+            return res.json({
                 success: true,
-                count: plans.length,
                 data: plans
             });
         } catch (error) {
             console.error(
-                'Error fetching subscription plans:',
+                'Get subscription plans error:',
                 error
             );
             return res.status(500).json({
                 success: false,
-                message: 'Failed to fetch subscription plans'
+                message:
+                    'Unable to load subscription plans'
             });
         }
     };
-
+    
     // GET /subscription-plans/:id
     getPlan = async (req, res) => {
         try {
@@ -39,7 +44,7 @@ class SubscriptionPlanController {
             if (!plan) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Subscription plan not found'
+                    message: 'Plan not found'
                 });
             }
             return res.json({
@@ -47,15 +52,15 @@ class SubscriptionPlanController {
                 data: plan
             });
         } catch (error) {
-            console.error(error);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to fetch subscription plan'
+                message: 'Unable to load plan'
             });
         }
     };
-
+  
     // POST /subscription-plans
+    // Admin only
     createPlan = async (req, res) => {
         try {
             const {
@@ -64,14 +69,45 @@ class SubscriptionPlanController {
                 price,
                 currency = 'UGX',
                 interval = 'monthly',
-                trialDays = 14
+                trialDays = 14,
+                graceDays = 3
             } = req.body;
+
             if (!name || price === undefined) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Name and price are required'
+                    message:
+                        'name and price are required'
                 });
             }
+
+            const existing =
+                await this.SubscriptionPlan.findOne({
+                    where: {
+                        name
+                    }
+                });
+            if (existing) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'A plan with this name already exists'
+                });
+            }
+
+            // Create plan at DGateway first
+            const dgatewayPlan =
+                await createPlan({
+                    name,
+                    description,
+                    amount: price,
+                    currency,
+                    interval,
+                    trialDays,
+                    graceDays
+                });
+            const dgPlan = dgatewayPlan?.data;
+
             const plan =
                 await this.SubscriptionPlan.create({
                     name,
@@ -80,21 +116,31 @@ class SubscriptionPlanController {
                     currency,
                     interval,
                     trialDays,
+                    graceDays,
+                    dgatewayPlanId:
+                        dgPlan?.id
+                            ? String(dgPlan.id)
+                            : null,
                     isActive: true
                 });
             return res.status(201).json({
                 success: true,
-                message: 'Subscription plan created',
+                message:
+                    'Subscription plan created',
                 data: plan
             });
         } catch (error) {
             console.error(
-                'Error creating subscription plan:',
+                'Create plan error:',
                 error
             );
-            return res.status(500).json({
+            return res.status(
+                error.status || 500
+            ).json({
                 success: false,
-                message: error.message
+                message:
+                    error.message ||
+                    'Unable to create subscription plan'
             });
         }
     };
@@ -109,26 +155,25 @@ class SubscriptionPlanController {
             if (!plan) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Subscription plan not found'
+                    message: 'Plan not found'
                 });
             }
             await plan.update(req.body);
             return res.json({
                 success: true,
-                message: 'Subscription plan updated',
                 data: plan
             });
         } catch (error) {
-            console.error(error);
             return res.status(500).json({
                 success: false,
-                message: error.message
+                message:
+                    'Unable to update subscription plan'
             });
         }
     };
 
     // DELETE /subscription-plans/:id
-    deletePlan = async (req, res) => {
+    deactivatePlan = async (req, res) => {
         try {
             const plan =
                 await this.SubscriptionPlan.findByPk(
@@ -137,25 +182,27 @@ class SubscriptionPlanController {
             if (!plan) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Subscription plan not found'
+                    message: 'Plan not found'
                 });
             }
-            // state to inactive beta of deleting
             await plan.update({
                 isActive: false
             });
             return res.json({
                 success: true,
-                message: 'Subscription plan deactivated'
+                message:
+                    'Subscription plan deactivated'
             });
         } catch (error) {
-            console.error(error);
             return res.status(500).json({
                 success: false,
-                message: error.message
+                message:
+                    'Unable to deactivate plan'
             });
         }
     };
 }
 
+
 module.exports = SubscriptionPlanController;
+
