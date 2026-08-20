@@ -172,6 +172,41 @@ class SubscriptionPlanController {
         }
     };
 
+
+    // PATCH /subscription-plans/:id/status
+    toggleStatus = async (req, res) => {
+        try {
+            const plan = await this.SubscriptionPlan.findByPk(
+                req.params.id
+            );
+
+            if (!plan) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Subscription plan not found'
+                });
+            }
+
+            await plan.update({
+                isActive: !plan.isActive
+            });
+            return res.json({
+                success: true,
+                message: plan.isActive
+                    ? 'Subscription plan activated'
+                    : 'Subscription plan deactivated',
+                data: plan
+            });
+
+        } catch (error) {
+            console.error('Toggle plan error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to change plan status'
+            });
+        }
+    };
+
     // DELETE /subscription-plans/:id
     deactivatePlan = async (req, res) => {
         try {
