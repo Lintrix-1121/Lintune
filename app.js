@@ -131,7 +131,7 @@ app.use('/upload',
 app.use('/dold', authenticate, requireSubscription, require('./routes/downloadRoutes')(downloadController));
 app.use('/tune', authenticate, requireSubscription, require('./routes/tuneRoutes'));
 
-app.use('/subscription-plans', require('./routes/subscriptionnPlanRoutes')(
+app.use('/subscription-plans', require('./routes/subscriptionPlanRoutes')(
   subscriptionPlanController, authenticate
 ));
 app.use('/subscriptions', require('./routes/subscriptionRoutes')(
